@@ -11,13 +11,15 @@ import Control.Arrow ( (***) )
 import Control.Monad ( join )
 
 
--- analogous to 'first' and 'second' from Control.Arrow:
+-- | An analog function to 'first' and 'second' from @Control.Arrow@:
 both :: (a -> b) -> (a,a) -> (b,b)
 both = join (***)
 
+-- boobs operator  (is there an official name!?)
 infixr 8 .:
 (.:) = (.).(.)
 
+-- | Test whether two lists have the same length.
 equalLength :: [a] -> [b] -> Bool
 equalLength [] [] = True
 equalLength (_:xs) (_:ys) = equalLength xs ys
