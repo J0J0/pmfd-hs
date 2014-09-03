@@ -3,6 +3,9 @@ module PolygonScheme
 (
       Symbol
     , Scheme
+    , SchemeWL(..)
+    , sloop
+    , toSchemeWL
     , invSymb
     , invSch
     , isProperScheme
@@ -18,6 +21,7 @@ import Control.Monad.State
 import Data.Char ( chr )
 import qualified Data.Foldable as F ( all )
 import Data.List ( foldr, reverse )
+import Data.Maybe ( fromMaybe )
 import qualified Data.Map.Strict as M
 
 newtype Symbol = Symbol Integer deriving (Eq, Ord)
@@ -70,7 +74,17 @@ splitBeforeLastPair xs = ([], xs)
 
 -- normalizing a scheme
 
-type SchemeWL = State Scheme Scheme
+data SchemeWL  = SchemeWL {   scheme :: Scheme
+                            , msloop  :: Maybe Scheme }
+                 deriving (Show)
+
+sloop :: SchemeWL -> Scheme
+sloop = fromMaybe [] . msloop
+
+toSchemeWL :: Scheme -> SchemeWL
+toSchemeWL sch = SchemeWL sch Nothing
+
+type SchemeWLst = State Scheme Scheme
 
 -- modify loop
 
@@ -112,10 +126,10 @@ subs2rS :: Symbol -> Scheme -> Symbol -> Scheme -> State Scheme ()
 subs2rS s1 sch1 s2 sch2 = modify (reduce . subs2 s1 sch1 s2 sch2)
 
 -- move aa in front
-step1 :: Scheme -> SchemeWL
+step1 :: Scheme -> SchemeWLst
 step1 = step1h [] [] 
 
-step1h :: Scheme -> Scheme -> Scheme -> SchemeWL
+step1h :: Scheme -> Scheme -> Scheme -> SchemeWLst
 step1h pairs pre [] = return $ pairs ++ reverse pre
 step1h pairs pre (x:xs) =
     case break (==x) xs of
@@ -127,10 +141,10 @@ step1h pairs pre (x:xs) =
 
 
 -- remove aa'
-step2 :: Scheme -> SchemeWL
+step2 :: Scheme -> SchemeWLst
 step2 = step2h True []
 
-step2h :: Bool -> Scheme -> Scheme -> SchemeWL
+step2h :: Bool -> Scheme -> Scheme -> SchemeWLst
 step2h check s1 s2
     | len2 < 2 || (check && len1 + len2 <= 4) =
         return $ reverse s1 ++ s2
@@ -146,14 +160,14 @@ step2h check s1 (y:yy:ys)
     
     
 -- group aba'b' together
-step3 :: Scheme -> SchemeWL
+step3 :: Scheme -> SchemeWLst
 step3 s = do
         rest' <- step3h [] rest
         return $ pairs ++ rest'
             where
                 (pairs,rest) = splitAfterLastPair s
 
-step3h :: Scheme -> Scheme -> SchemeWL
+step3h :: Scheme -> Scheme -> SchemeWLst
 step3h y1r xs
     | length xs <= 4  = return $ reverse y1r ++ xs
 step3h y1r (x:xs) = do
@@ -183,7 +197,7 @@ step3h y1r (x:xs) = do
 
 
 -- convert ccaba'b' to aabbcc
-step4 :: Scheme -> SchemeWL
+step4 :: Scheme -> SchemeWLst
 step4 xs
     | length xs <= 4  = return xs
 step4 xs@(x:xx:_)
@@ -191,7 +205,7 @@ step4 xs@(x:xx:_)
     | otherwise  = do let (pairs, (x:_:rest)) = splitBeforeLastPair xs
                       step4h pairs x rest
 
-step4h :: Scheme -> Symbol -> Scheme -> SchemeWL
+step4h :: Scheme -> Symbol -> Scheme -> SchemeWLst
 step4h w0 x [] = return $ w0 ++ [x,x]
 step4h w0 x (y:z:_:_:rest') = do
     let w1w0 = rest' ++ w0
@@ -209,20 +223,21 @@ step5' xs@[x,xx,y,yy]
     | x == invSymb yy && xx == invSymb y   =  [yy,x,xx,y]
 step5' xs = xs
 
-step5 :: Scheme -> SchemeWL
+step5 :: Scheme -> SchemeWLst
 step5 = return . step5'
 
 -- do all steps
-normalizeSchemeWL :: Scheme -> Scheme -> (Scheme, Scheme)
-normalizeSchemeWL sch loop =
-    runState (allSteps sch) loop
+normalizeSchemeWL :: SchemeWL -> SchemeWL
+normalizeSchemeWL sch =
+    SchemeWL sch' (msloop sch >> Just loop')
     where
-        allSteps sch = return sch >>= step1 >>= step2
+        (sch', loop') = runState (allSteps $ scheme sch) (sloop sch)
+        allSteps sch  = return sch >>= step1 >>= step2
                        >>= step3 >>= step4 >>= step5
 
 normalizeScheme :: Scheme -> Scheme
-normalizeScheme sch =
-    fst $ normalizeSchemeWL sch []
+normalizeScheme =
+    scheme . normalizeSchemeWL . toSchemeWL
 
 
 -- rename symbols to obtain obtain canonical form
