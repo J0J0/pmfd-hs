@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs, GADTSyntax, StandaloneDeriving #-}
 
 -- |
 -- Module      : SimplicialComplex
@@ -17,23 +18,20 @@
 
 module SimplicialComplex
 (
-      Vertex
+      Vertex(..)
     , Simplex
     , Complex
-    , vertexToIntegral
-    , vertexFromIntegral
-    , vertexMapCalc
+    , vMap
+    , simplexMap
     , dimS
     , isNSimplex
     , isFaceOf
-    , simplexMapCalc
     , vertices
+    , complexMap
     , dim
     , generatedBy
     , facets
     , connectedComponents
-    , calculateOffset
-    , complexMapCalc
     , isConnected
     , isPseudoManifold
     , isStronglyConnected
@@ -64,125 +62,87 @@ import Data.List (
 import Control.Monad.State
 import Util ( equalLength, roundToMagnitude )
 
--- | A 'Vertex' is basically an 'Integer' in the default implementation.
---   (We use Integers instead of Ints because they are more
---   mathematical, but both is fine for the library.)
---   
---   If desired, vertices can contain more information, e. g. labels
---   (see the source code for an example).
---   Make sure to change 'vertexToIntegral', 'vertexFromIntegral',
---   'vertexMapCalc' and the 'Show' instance declaration accordingly.
-newtype Vertex = Vertex { val :: Integer } deriving (Eq, Ord)
+-- | A 'Vertex' can be anything you like and is an intance of 'Eq'.
+data Vertex a where
+    Vertex :: (Eq a) => a -> Vertex a
+
+deriving instance Eq (Vertex a)
+deriving instance (Ord a) => Ord (Vertex a)
+instance (Show a) => Show (Vertex a) where show (Vertex v) = show v
 
 -- | A 'Simplex' is just a "set" of 'Vertex' elements.
-type Simplex = [Vertex]
+type Simplex a = [Vertex a]
 
 -- | A 'Complex' is a "set" of 'Simplex' elements.
-type Complex = [Simplex]
+type Complex a = [Simplex a]
 
 
 -- vertices
 
-instance Show Vertex where
-    show = show . val
-
--- | The function 'vertexToIntegral' should define a bijection
---   between (used) vertices and some subset of the integers.
-vertexToIntegral :: (Integral i) => Vertex -> i
-vertexToIntegral = fromIntegral . val
-
--- | 'vertexFromIntegral' is more or less an inverse to 'vertexToIntegral':
--- 
---   > vertexToIntegral . vertexFromIntegral == id
---
---   should always hold, but the other composition might not be the identity
---   if vertices contain more information. (See also 'vertexMapCalc'.)
-vertexFromIntegral :: (Integral i) => i -> Vertex
-vertexFromIntegral = Vertex . fromIntegral
-
--- | To avoid the problem described at 'vertexFromIntegral',
---   we provide a function that maps a calculation over the
---   underlying integer of the 'Vertex' without losing whatever
---   context the vertex carries.
---
---   > vertexMapCalc id == id
-vertexMapCalc :: (Integral i) => (i -> i) -> Vertex -> Vertex
-vertexMapCalc f = vertexFromIntegral . f . vertexToIntegral
-
--- Alternative definition of the Vertex type and accompanying functions:
--- 
--- data Vertex = Vertex { val :: Int, label :: String } deriving (Eq, Ord)
--- instance Show Vertex where show = label
--- vertexToIntegral = fromIntegral . val
--- vertexFromIntegral k = Vertex (fromIntegral k) ("#"++(show k))
--- vertexMapCalc f (Vertex v l) = Vertex (fromIntegral . f .fromIntegral $ v) l
+-- can't make a Functor instance because b needs to be an Eq instance :(
+vMap :: (Eq a, Eq b) => (a -> b) -> Vertex a -> Vertex b
+vMap f (Vertex v) = Vertex (f v)
 
 
 -- simplices
 
+simplexMap :: (Eq a, Eq b) => (a -> b) -> Simplex a -> Simplex b
+simplexMap f = map $ vMap f
+
 -- | Return the dimension of a simplex.
-dimS :: (Integral i) => Simplex -> i
+dimS :: (Integral i) => Simplex a -> i
 dimS s = genericLength s - 1
 
 -- | Test whether a simplex is of specific dimension.
-isNSimplex :: (Integral i) => i -> Simplex -> Bool
+isNSimplex :: (Integral i) => i -> Simplex a -> Bool
 isNSimplex n s = dimS s == n
 
 -- | Test whether a simplex is face of another,
 --   that is, if it is a subset of the second simplex.
-isFaceOf :: Simplex -> Simplex -> Bool
+isFaceOf :: Simplex a -> Simplex a -> Bool
 isFaceOf s s' = all (`elem` s') s
-
--- | 'vertexMapCalc' liftet to simplices.
-simplexMapCalc :: (Integral i) => (i -> i) -> Simplex -> Simplex
-simplexMapCalc f = map (vertexMapCalc f)
 
 
 -- complexes
 
 -- | Compute the "set" of vertices of a complex
 --   (which is the union over all simplices).
-vertices :: Complex -> [Vertex]
+vertices :: Complex a -> [Vertex a]
 vertices = foldr union []
 
--- | 'simplexMapCalc' liftet to complexes.
-complexMapCalc :: (Integral i) => (i -> i) -> Complex -> Complex
-complexMapCalc f = map (simplexMapCalc f)
+complexMap :: (Eq a, Eq b) => (a -> b) -> Complex a -> Complex b
+complexMap f =
+    map $ map $ vMap f
 
 -- | Return the dimension of a complex.
-dim :: (Integral i) => Complex -> i
+dim :: (Integral i) => Complex a -> i
 dim = maximum . map dimS
 
 -- | Return all facets of a complex. Here a facet is a simplex
 --   that has the same dimension of the complex (which differs 
 --   from the usual mathematical definition for non pure complexes).
-facets :: Complex -> [Simplex]
+facets :: Complex a -> [Simplex a]
 facets c = filter (isNSimplex $ dim c) c
 
 -- | 'generatedBy' takes a list of simplices and adds all faces
 --   of those simplices. The result should always be a valid complex
 --   (if the simplices were valid).
-generatedBy :: [Simplex] -> Complex
+generatedBy :: [Simplex a] -> Complex a
 generatedBy c = foldr addFaces c c
     where
         addFaces s c' = c' `union` (subsequences s)
 
--- | Utility function returning an integer @k@ such that
---   @'vertexToIntegral' v <= k@ for all vertices @v@ of the given complex.
-calculateOffset :: (Integral i) => Complex -> i
-calculateOffset =
-    roundToMagnitude . (+1) . maximum . map vertexToIntegral . vertices
 
-isConnected :: Complex -> Bool
+isConnected :: Complex a -> Bool
 isConnected c = equalLength allVertices foundVertices
     where
         allVertices = vertices c
         foundVertices = dfsVertices c $ head allVertices
 
-isPseudoManifold :: Complex -> Bool
+isPseudoManifold :: Complex a -> Bool
 isPseudoManifold c = isNPseudoManifold (dim c) c
 
-isNPseudoManifold :: (Integral i) => i -> Complex -> Bool
+isNPseudoManifold :: (Integral i) => i -> Complex a -> Bool
 isNPseudoManifold n c = all (validSimplex n c) c
     where
         validSimplex n c' s =
@@ -192,10 +152,10 @@ isNPseudoManifold n c = all (validSimplex n c) c
                 EQ -> length parentFacets == 2
                 LT -> not . null $ parentFacets
 
-isStronglyConnected :: Complex -> Bool
+isStronglyConnected :: Complex a -> Bool
 isStronglyConnected c = isNStronglyConnected (dim c) c
 
-isNStronglyConnected :: (Integral i) => i -> Complex -> Bool
+isNStronglyConnected :: (Integral i) => i -> Complex a -> Bool
 isNStronglyConnected n c = equalLength nSimplices foundSimplices
     where
         nSimplices = filter (isNSimplex n) c
@@ -204,25 +164,25 @@ isNStronglyConnected n c = equalLength nSimplices foundSimplices
 -- | Return all parent simplices of a simplex where a
 --   /parent simplex of @s@/ is any simplex @s'@
 --   such that @s@ is a face of @s'@.
-parentSimplices :: Simplex -> [Simplex] -> [Simplex]
+parentSimplices :: Simplex a -> [Simplex a] -> [Simplex a]
 parentSimplices s = filter (s `isFaceOf`)
 
 -- | Return the star of a vertex.
-star :: Vertex -> Complex -> Complex
+star :: Vertex a -> Complex a -> Complex a
 star v c = generatedBy $ parentSimplices [v] c
 
 -- | Compute the Euler characteristic of a complex.
-eulerCharacteristic :: (Integral i) => Complex -> i
+eulerCharacteristic :: (Integral i) => Complex a -> i
 eulerCharacteristic =
     foldl' f 0 . delete []
         where
             f sum s = sum + (-1)^(dimS s)
 
 -- | Return the set of connected components of a complex.
-connectedComponents :: Complex -> [Complex]
+connectedComponents :: Complex a -> [Complex a]
 connectedComponents c = unfoldr (findConnectedComponent c) $ vertices c
 
-findConnectedComponent :: Complex -> [Vertex] -> Maybe (Complex, [Vertex])
+findConnectedComponent :: Complex a -> [Vertex a] -> Maybe (Complex a, [Vertex a])
 findConnectedComponent _ [] = Nothing
 findConnectedComponent c vs =
     Just (component, remainingVertices)
@@ -234,21 +194,21 @@ findConnectedComponent c vs =
 
 -- | Perform depth first search on the 1-skeleton of a complex,
 --   starting at a given vertex. Returns all found vertices.
-dfsVertices :: Complex -> Vertex -> [Vertex]
+dfsVertices :: Complex a -> Vertex a -> [Vertex a]
 dfsVertices c v = map head $ execState (dfs dfsHVertex c [v]) []
 
 -- | Perform depth first search with simplices where two n-simplices
 --   are considered adjacent if they share a common (n-1)-simplex.
 --   Returns all found simplices of the same dimension as the starting
 --   simplex.
-dfsSimplices :: Complex -> Simplex -> [Simplex]
+dfsSimplices :: Complex a -> Simplex a -> [Simplex a]
 dfsSimplices c s = execState (dfs dfsHSimplex c s) []
 
 
 -- for debug purposes
 
 -- | Test whether a complex contains all faces of its simplices.
-isValid :: Complex -> Bool
+isValid :: Complex a -> Bool
 isValid c = all (containsFaces c) c
     where
         containsFaces c' s = all (`elem` c') $ subsequences s
@@ -256,7 +216,7 @@ isValid c = all (containsFaces c) c
 -- | Test whether the simplices and the complex itself are proper "sets".
 --   For instance, @'isValid' [[],[1],[1]] == True@, but
 --   'isStructurallyValid' would return @False@.
-isStructurallyValid :: Complex -> Bool
+isStructurallyValid :: Complex a -> Bool
 isStructurallyValid c = t1 && t2
         where 
             t1 = all (\ s -> genericLength s == (genericLength . nub) s) c
@@ -266,11 +226,11 @@ isStructurallyValid c = t1 && t2
 
 -- private
 
-mark :: Simplex -> State [Simplex] ()
+mark :: Simplex a -> State [Simplex a] ()
 mark s = modify (s:)
-marked :: Simplex -> State [Simplex] Bool
+marked :: Simplex a -> State [Simplex a] Bool
 marked s = gets (s `elem`)
-dfs :: DfsHFunc -> Complex -> Simplex -> State [Simplex] ()
+dfs :: DfsHFunc a -> Complex a -> Simplex a -> State [Simplex a] ()
 dfs adjObj c s = do
     visited <- marked s
     if visited
@@ -279,14 +239,14 @@ dfs adjObj c s = do
         mark s
         mapM_ (dfs adjObj c) $ adjObj s c
 
-type DfsHFunc = Simplex -> Complex -> [Simplex]
+type DfsHFunc a = Simplex a -> Complex a -> [Simplex a]
 
-dfsHVertex :: DfsHFunc
+dfsHVertex :: DfsHFunc a
 dfsHVertex s@[v] c =
     let edges = filter (isNSimplex 1) $ parentSimplices s c
     in map (delete v) edges
 
-dfsHSimplex :: DfsHFunc
+dfsHSimplex :: DfsHFunc a
 dfsHSimplex s c =
     let n = dimS s
         isAdjacend = isNSimplex (n-1) . (s `intersect`)
