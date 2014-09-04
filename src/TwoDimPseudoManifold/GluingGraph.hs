@@ -1,58 +1,80 @@
+{-# LANGUAGE StandaloneDeriving #-}
 
 module TwoDimPseudoManifold.GluingGraph
 (
-      GluingGraph
+      GluingGraphD
+    , GluedVertices
     , GluedComplexes
     , GluedSurfaces
+    , GluedD(..)
     , gluingGraph
     , gluingGraphSurf
 ) where
     
-import Control.Arrow ( second )
+import Control.Arrow ( (&&&), second )
+import Data.List ( nub )
 import qualified Data.Map.Strict as  M
 import qualified Data.Map.Lazy   as LM
+import Data.Maybe ( fromJust )
+import Data.Tuple ( swap )
 
 import SimplicialComplex ( 
-                             Complex
+                             Vertex(..)
+                           , Complex
                            , connectedComponents
-                           , vertexToIntegral
                            , vertices
+                           , vMap
  )
 import TwoDimPseudoManifold ( fixAllSingularities )
 import TwoDimManifold ( identifySurface )
 import Surface ( Surface )
 
 
-type GluingGraph i = M.Map (i,i) i
-type GluedObj o i = LM.Map i o
-type GluedComplexes i = GluedObj Complex i
-type GluedSurfaces  i = GluedObj Surface i
+type GComplex a   = Complex (a, Int)
+type GluingGraphD = M.Map (Int,Int) Int
+type GluedObj o   = LM.Map Int o
+type GluedVertices  a = GluedObj (Vertex a)
+type GluedComplexes a = GluedObj (GComplex a)
+type GluedSurfaces    = GluedObj Surface
 
+data GluedD a = GluedD {  
+                         glGraphD    :: GluingGraphD
+                       , glVertices  :: GluedVertices a
+                       , glComplexes :: GluedComplexes a
+                       }
 
-gluingGraph :: (Integral i) =>
-    Complex -> (GluingGraph i, GluedComplexes i)
-gluingGraph = uncurry fixedGluingGraph . fixAllSingularities
+deriving instance (Show a) => Show (GluedD a)
 
-fixedGluingGraph :: (Integral i) =>
-    Complex -> i -> (GluingGraph i, GluedComplexes i)
-fixedGluingGraph c offs =
-    (graph, comps)
-    where
-        comps = LM.fromAscList $ [0..] `zip` connectedComponents c
-        graph = LM.foldrWithKey (addGluingData offs) M.empty comps
+gluingGraph :: (Eq a) =>  Complex a -> GluedD a
+gluingGraph = fixedGluingGraph . fixAllSingularities
 
-addGluingData :: (Integral i) =>
-    i -> i -> Complex -> GluingGraph i -> GluingGraph i
-addGluingData offs j comp m =
-    foldr (\ v -> M.insertWith (+) (v,j) 1) m gluedToVs
+fixedGluingGraph :: (Eq a) => GComplex a -> GluedD a
+fixedGluingGraph c =
+    GluedD { glGraphD = graph, glVertices = vsm, glComplexes = comps }
         where
-            gluedVs = filter (>= offs) . map vertexToIntegral $ vertices comp
-            gluedToVs = map (`mod` offs) gluedVs
+            comps = LM.fromDistinctAscList $ [0..] `zip` connectedComponents c
+            vs  = nub $ map (vMap fst) $ filter isGluedV $ vertices c
+            vsi = vs `zip` [0..]
+            vsm = LM.fromDistinctAscList $ map swap vsi
+            graph = LM.foldrWithKey (addGluingData vsi) M.empty comps
 
-gluingGraphSurf :: (Integral i) =>
-    Complex -> (GluingGraph i, GluedSurfaces i)
-gluingGraphSurf = identifyGluedSurfaces . gluingGraph
+isGluedV :: Vertex (a, Int) -> Bool
+isGluedV (Vertex (_,t)) = t /= 0
 
-identifyGluedSurfaces :: (Integral i) =>
-    (GluingGraph i, GluedComplexes i) -> (GluingGraph i, GluedSurfaces i)
-identifyGluedSurfaces = second (LM.map identifySurface)
+addGluingData :: (Eq a) =>
+                    [(Vertex a, Int)] -> Int -> GComplex a ->
+                        GluingGraphD -> GluingGraphD
+addGluingData vsi j comp m =
+    foldr (\ v -> M.insertWith (+) (toId v,j) 1) m gluedToVs
+        where
+            gluedVs   = filter isGluedV $ vertices comp
+            gluedToVs = map (vMap fst) gluedVs 
+            toId v = fromJust $ lookup v vsi
+
+gluingGraphSurf :: (Eq a) =>
+                    Complex a -> (GluingGraphD, GluedSurfaces)
+gluingGraphSurf =
+    (glGraphD &&& identifyGluedSurfaces) . gluingGraph
+
+identifyGluedSurfaces :: GluedD a -> GluedSurfaces
+identifyGluedSurfaces = LM.map identifySurface . glComplexes

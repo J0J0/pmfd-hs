@@ -15,22 +15,20 @@ import qualified Data.Set as Set
 import qualified Text.PrettyPrint.Leijen.Text.Monadic as PP (char, (<>))
 
 import TwoDimPseudoManifold.GluingGraph (
-                                            GluingGraph
+                                            GluingGraphD
                                           , GluedSurfaces
  )
 import Surface ( Surface )
 
 
-data NodeType i = GluingNode i | SurfaceNode i deriving (Show)
-deriving instance (Eq i)  => Eq  (NodeType i)
-deriving instance (Ord i) => Ord (NodeType i)
+data NodeType = GluingNode Int | SurfaceNode Int deriving (Eq, Ord, Show)
 
-instance (Integral i) => GV.PrintDot (NodeType i) where
-    unqtDot (GluingNode x)  = (PP.<>) (PP.char 'g') (GV.unqtDot $ toInteger x)
-    unqtDot (SurfaceNode x) = (PP.<>) (PP.char 's') (GV.unqtDot $ toInteger x)
+instance GV.PrintDot (NodeType) where
+    unqtDot (GluingNode x)  = (PP.<>) (PP.char 'g') (GV.unqtDot x)
+    unqtDot (SurfaceNode x) = (PP.<>) (PP.char 's') (GV.unqtDot x)
 
-type Node i = (NodeType i, Maybe Surface)
-type Edge i = (NodeType i, NodeType i, i)
+type Node = (NodeType, Maybe Surface)
+type Edge = (NodeType, NodeType, Int)
 
 --gvParams :: GraphvizParams ...
 gvParams = GV.Params {   GV.isDirected       = False
@@ -45,7 +43,7 @@ gvParams = GV.Params {   GV.isDirected       = False
 
 data Cluster = GluingCl | SurfaceCl deriving (Eq, Ord, Enum, Bounded, Show)
 
-clusterize :: Node i -> GV.NodeCluster Cluster (Node i)
+clusterize :: Node -> GV.NodeCluster Cluster Node
 clusterize (n,s) =
     GV.C cl $ GV.N (n,s)
         where
@@ -58,19 +56,18 @@ clusterFmt cl =
             sh GluingCl  = GV.PointShape
             sh SurfaceCl = GV.Ellipse
 
-nodeFmt :: Node i -> GV.Attributes
+nodeFmt :: Node -> GV.Attributes
 nodeFmt (GluingNode _, _)       = []
 nodeFmt (SurfaceNode _, Just s) = [ GV.toLabel $ show s ]
 
-visualizeGluingGraph :: (Integral i) =>
-    (GluingGraph i, GluedSurfaces i) -> IO ()
+visualizeGluingGraph :: (GluingGraphD, GluedSurfaces) -> IO ()
 visualizeGluingGraph gd@(gg, _) =
     GV.runGraphvizCanvas' (GV.graphElemsToDot gvParams ns es) GV.Xlib
         where
             ns = buildNodes gd
             es = buildEdges gg
 
-buildNodes :: (Integral i) => (GluingGraph i, GluedSurfaces i) -> [Node i]
+buildNodes :: (GluingGraphD, GluedSurfaces) -> [Node]
 buildNodes (m, mm) =
     Set.toList gluingNodes ++ surfaceNodes
         where
@@ -78,7 +75,7 @@ buildNodes (m, mm) =
             gluingNodes  = Set.map (GluingNode *** const Nothing) edges
             surfaceNodes = map (SurfaceNode *** Just) $ LM.toList mm
 
-buildEdges :: (Integral i) => GluingGraph i -> [Edge i]
+buildEdges :: GluingGraphD -> [Edge]
 buildEdges m =
     M.foldrWithKey addEdges [] m
         where
