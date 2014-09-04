@@ -1,33 +1,34 @@
 
 module SimplicialComplex.Generator where
 
+import Control.Arrow ( (&&&) )
 import Data.List (
                      (\\)
+                   , concatMap
                    , nub
                    , foldl
                    , foldr1
                    , sort
                    , union
  )
-import qualified Data.Map.Strict as M
+import Data.Maybe ( fromMaybe )
 
 import SimplicialComplex
-import Util ( (.:), both )
+import Util ( (.:), both, filter2 )
 
 
-type GlueData = [(Vertex,Vertex)]
+type GlueData a = [(Vertex a,Vertex a)]
 
-glueVertices :: GlueData -> Complex -> Complex
+glueVertices :: GlueData a -> Complex a -> Complex a
 glueVertices glueData c =
-    nub $ map (nub . sort . map projectVertex) c
+    nub $ map (nub . map projectVertex) c
         where
-            glueMap = M.fromAscList glueData
-            projectVertex v = M.findWithDefault v v glueMap
+            projectVertex v = fromMaybe v $ lookup v glueData
 
-triangulatedRectangle :: Int -> Int -> Complex
+triangulatedRectangle :: Int -> Int -> Complex Int
 triangulatedRectangle nx ny = triangulatedRectangle' nx ny []
 
-triangulatedRectangle' :: Int -> Int -> [(Int,Int)] -> Complex
+triangulatedRectangle' :: Int -> Int -> [(Int,Int)] -> Complex Int
 triangulatedRectangle' nx ny swapped =
     generatedBy $ map (map $ lexiV nx) $ concat [
         [[(x,y),(x+1,y),v1],
@@ -39,16 +40,16 @@ triangulatedRectangle' nx ny swapped =
                      then ( (x,y+1), (x+1,y) )
                      else ( (x+1,y+1), (x,y) )
 
-lexiV :: Int -> (Int, Int) -> Vertex
-lexiV nx (x,y) = vertexFromIntegral $ x + (nx+1)*(y-1)
+lexiV :: Int -> (Int, Int) -> Vertex Int
+lexiV nx (x,y) = Vertex $ x + (nx+1)*(y-1)
 
 data GlueOr   = SameOr | OppOr  deriving (Eq, Ord, Enum, Show)
 data GlueSpec = GlueSpec { xOr :: GlueOr, yOr :: GlueOr }  deriving (Eq, Show)
 
-gluedRectangle :: GlueSpec -> Complex
+gluedRectangle :: GlueSpec -> Complex Int
 gluedRectangle = gluedRectangle' 3 3
 
-gluedRectangle' :: Int -> Int -> GlueSpec -> Complex
+gluedRectangle' :: Int -> Int -> GlueSpec -> Complex Int
 gluedRectangle' nx ny gs =
     glueVertices glueData $ triangulatedRectangle' nx ny [(nx,1)]
         where
@@ -69,57 +70,93 @@ genRectGlueIData nx ny gs =
         [mx*ny+2..mx*my-1] `zip` trafo xOr [2..mx-1]              ++
         [(mx*my, 1)]
 
-fromIntData :: [(Int,Int)] -> GlueData
-fromIntData = map (both vertexFromIntegral)
+fromIntData :: [(Int,Int)] -> GlueData Int
+fromIntData = map (both Vertex)
 
 
-disjointUnion :: Complex -> Complex -> Complex
-disjointUnion = fst .: disjointUnion'
+disjointUnion :: (Eq a, Eq b) => 
+                    Complex a -> Complex b -> Complex (Either a b)
+disjointUnion c c' =
+   complexMap Left c `union` complexMap Right c'
 
-disjointUnion' :: (Integral i) => Complex -> Complex -> (Complex, i)
-disjointUnion' c1 c2 =
-    (c1 `union` c2', offs)
+disjointUnions :: (Eq a) => [Complex a] -> Complex (a, Int)
+disjointUnions = disjointUnionsInd 1
+
+disjointUnionsInd :: (Eq a) => 
+                        Int -> [Complex a] -> Complex (a, Int)
+disjointUnionsInd t cs =
+    concatMap f $ cs `zip` [t..]
         where
-            c2'  = complexMapCalc (+offs) c2
-            offs = calculateOffset c1
+            f (c,j) = complexMap (id &&& const j) c
 
-disjointUnions :: [Complex] -> Complex
-disjointUnions = foldr1 disjointUnion
-
-
-connectedSumAt :: Simplex -> Complex -> Simplex -> Complex -> Complex
+connectedSumAt :: (Eq a, Eq b) =>
+                    Simplex a -> Complex a -> Simplex b -> Complex b ->
+                        Complex (Either a b)
 connectedSumAt s1 c1 s2 c2 =
-    let (cc, offs) = disjointUnion' c1 c2
-        s2' = simplexMapCalc (+offs) s2
-        gd = s2' `zip` s1
-        cc' = if dimS s1 == 0 then cc else cc \\ [s1,s2']
-    in glueVertices gd $ cc'
+    let cc  = disjointUnion c1 c2
+        s1' = simplexMap Left s1
+        s2' = simplexMap Right s2
+    in innerConnectedSumAt s1' s2' cc
 
-connectedSum :: Complex -> Complex -> Complex
+innerConnectedSumAt :: (Eq a) =>
+                        Simplex a -> Simplex a -> Complex a -> Complex a
+innerConnectedSumAt s1 s2 c =
+    let gd  = s2 `zip` s1
+        c' = if isNSimplex 0 s1 then c else c \\ [s1,s2]
+    in glueVertices gd c'
+
+innerConnectedSum :: (Integral i, Eq a) =>
+                        i -> (a -> Bool) -> (a -> Bool) ->
+                            Complex a -> Complex a
+innerConnectedSum d p q c =
+    let pred p' s    = isNSimplex d s && let (Vertex x:_) = s in p' x
+        (s1:_, s2:_) = filter2 (pred p) (pred q) c
+    in innerConnectedSumAt s1 s2 c
+
+connectedSum :: (Eq a, Eq b) =>
+                    Complex a -> Complex b -> Complex (Either a b)
 connectedSum c1 c2 =
     let d = min (dim c1) (dim c2)
     in connectedSum' d c1 c2
 
-connectedSum' :: (Integral i) => i -> Complex -> Complex -> Complex
+connectedSum' :: (Integral i, Eq a, Eq b) =>
+                    i -> Complex a -> Complex b -> Complex (Either a b)
 connectedSum' d c1 c2 =
-    let (s1, s2) = both findDSimplex (c1, c2)
-        findDSimplex = head . filter (isNSimplex d) 
-    in connectedSumAt s1 c1 s2 c2
+    connectedSumAt s1 c1 s2 c2
+        where
+            s1 = findDSimplex c1
+            s2 = findDSimplex c2
+            findDSimplex = head . filter (isNSimplex d) 
 
-connectedSums :: [Complex] -> Complex
-connectedSums = foldr1 connectedSum
+connectedSums :: (Eq a) => [Complex a] -> Complex (a, Int)
+connectedSums cs =
+    let d = minimum $ map dim cs
+    in connectedSums' d cs
+
+connectedSums' :: (Integral i, Eq a) =>
+                    i -> [Complex a] -> Complex (a, Int)
+connectedSums' d cs =
+    foldr connect ucs [2 .. length cs]
+        where
+            ucs        = disjointUnionsInd 1 cs
+            connect j  = innerConnectedSum d (matchInd (< j)) (matchInd (==j))
+            matchInd p (_,t) = p t
 
 
-wedgeSumAt :: Vertex -> Complex -> Vertex -> Complex -> Complex
+wedgeSumAt :: (Eq a, Eq b) =>
+                Vertex a -> Complex a -> Vertex b -> Complex b ->
+                     Complex (Either a b)
 wedgeSumAt v1 c1 v2 c2 =
     connectedSumAt [v1] c1 [v2] c2
 
-wedgeSum :: Complex -> Complex -> Complex
+wedgeSum :: (Eq a, Eq b) => Complex a -> Complex b -> Complex (Either a b)
 wedgeSum = connectedSum' 0
 
-wedgeSums :: [Complex] -> Complex
-wedgeSums (c:cs) =
-    foldl (\ cc c' -> wedgeSumAt v0 cc (anyV c') c') c cs
-        where
-            v0 = head $ vertices c
-            anyV c' = head $ vertices c'
+wedgeSums :: (Eq a) => [Complex a] -> Complex (a, Int)
+wedgeSums cs@(c:cs') =
+    let ucs = disjointUnionsInd 1 cs
+        newBaseP = vMap (id &&& const 1) $ head $ vertices c
+        bps = [ Vertex (v,j) | (c',j) <- cs' `zip` [2..],
+                               let Vertex v = head $ vertices c' ]
+        gd  = bps `zip` repeat newBaseP
+    in glueVertices gd ucs
