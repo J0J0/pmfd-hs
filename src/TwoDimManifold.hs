@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, StandaloneDeriving #-}
 
 module TwoDimManifold
 (
@@ -23,7 +23,7 @@ import Data.List (
 import Data.Maybe ( fromMaybe, fromJust, isNothing )
 
 import SimplicialComplex (
-                             Vertex
+                             Vertex(..)
                            , Simplex
                            , Complex
                            , dfsSimplices
@@ -49,55 +49,56 @@ import Surface (
 import Util ( (.:) )
 
 
-type PreScheme = [Simplex]
+type PreScheme a = [Simplex a]
 
-data ComplexWL = ComplexWL {  complex :: Complex
-                            , mloop   :: Maybe PreScheme }
-                 deriving (Show)
+data ComplexWL a = ComplexWL {   complex :: Complex a
+                               , cloop   :: Maybe (PreScheme a) }
 
-loop :: ComplexWL -> PreScheme
-loop = fromMaybe [] . mloop
+deriving instance (Show a) => Show (ComplexWL a)
 
-toComplWL :: Complex -> ComplexWL
+loop :: ComplexWL a -> PreScheme a
+loop = fromMaybe [] . cloop
+
+toComplWL :: Complex a -> ComplexWL a
 toComplWL c = ComplexWL c Nothing
 
 
-twoSimplexBoundary :: Simplex -> [Simplex]
+twoSimplexBoundary :: Simplex a -> [Simplex a]
 twoSimplexBoundary s =
     [[s!!0,s!!1], [s!!1,s!!2], [s!!2,s!!0]]
 
 
-identifySurface :: Complex -> Surface
+identifySurface :: Complex a -> Surface
 identifySurface = identifySurfaceScheme . polygonScheme
 
-polygonScheme :: Complex -> Scheme
+polygonScheme :: Complex a -> Scheme
 polygonScheme =
     scheme . normalizeSchemeWL . polygonSchemeWL . toComplWL
 
-polygonSchemeWL :: ComplexWL -> SchemeWL
+polygonSchemeWL :: ComplexWL a -> SchemeWL
 polygonSchemeWL c =
     polygonSchemeAtSimplex c $ head $ delete [] $ complex c
 
 
-polygonSchemeAtSimplex :: ComplexWL -> Simplex -> SchemeWL
+polygonSchemeAtSimplex :: ComplexWL a -> Simplex a -> SchemeWL
 polygonSchemeAtSimplex c s 
     | dimS s == 2   = polygonSchemeAtTwoSimplex c s
     | otherwise     = polygonSchemeAtTwoSimplex c s'
         where
             s' = head $ filter (isNSimplex 2) $ parentSimplices s (complex c)
 
-polygonSchemeAtTwoSimplex :: ComplexWL -> Simplex -> SchemeWL
+polygonSchemeAtTwoSimplex :: ComplexWL a -> Simplex a -> SchemeWL
 polygonSchemeAtTwoSimplex c s =
-    buildSchemeWL (mloop c) . reverse $ dfsSimplices (complex c) s
+    buildSchemeWL (cloop c) . reverse $ dfsSimplices (complex c) s
 
-buildScheme :: [Simplex] -> Scheme
+buildScheme :: [Simplex a] -> Scheme
 buildScheme = scheme . buildSchemeWL Nothing
 
-buildSchemeWL :: Maybe PreScheme -> [Simplex] -> SchemeWL
+buildSchemeWL :: Maybe (PreScheme a) -> [Simplex a] -> SchemeWL
 buildSchemeWL mbloop ss =
     fst $ buildSchemeWL' mbloop ss
 
-buildSchemeWL' :: Maybe PreScheme -> [Simplex] -> (SchemeWL, [(Simplex,Symbol)])
+buildSchemeWL' :: Maybe (PreScheme a) -> [Simplex a] -> (SchemeWL, [(Simplex a, Symbol)])
 buildSchemeWL' mbloop (s:ss) =
     (SchemeWL sch loop'', tab)
         where
@@ -107,8 +108,8 @@ buildSchemeWL' mbloop (s:ss) =
             (sch, tab) = preSchemeToScheme pSch
             loop'' = mbloop >> Just (translateVia tab loop')
 
-buildPSchemeWL :: PreScheme -> [Simplex] -> [Simplex] ->
-                    State PreScheme PreScheme
+buildPSchemeWL :: PreScheme a -> [Simplex a] -> [Simplex a] ->
+                    State (PreScheme a) (PreScheme a)
 buildPSchemeWL curPSch [] [] = return curPSch
 buildPSchemeWL curPSch [] ss' = buildPSchemeWL curPSch ss' []
 buildPSchemeWL curPSch (s:ss) ss' = do
@@ -116,8 +117,8 @@ buildPSchemeWL curPSch (s:ss) ss' = do
         Nothing   -> buildPSchemeWL curPSch ss (s:ss')
         Just pSch -> buildPSchemeWL pSch ss ss'
 
-tryPasteSimplex :: Simplex -> Simplex -> PreScheme -> 
-                    State PreScheme (Maybe PreScheme)
+tryPasteSimplex :: Simplex a -> Simplex a -> (PreScheme a) -> 
+                    State (PreScheme a) (Maybe (PreScheme a))
 tryPasteSimplex s s' sch =
     case break (`isFaceOf` s) sch of
       (_,[])            -> return Nothing
@@ -126,19 +127,19 @@ tryPasteSimplex s s' sch =
                               when (dimS s == 2) $ adjustLoop e s
                               return $ Just (sch' ++ [[v1,v3], [v3,v2]] ++ sch'')
 
-adjustLoop :: Simplex -> Simplex -> State PreScheme ()
+adjustLoop :: Simplex a -> Simplex a -> State (PreScheme a) ()
 adjustLoop e s = do
     l' <- get >>= tryPasteSimplex e s
     unless (isNothing l') $ put (fromJust l')
     return ()
 
-preSchemeToScheme :: PreScheme -> (Scheme, [(Simplex,Symbol)])
+preSchemeToScheme :: PreScheme a -> (Scheme, [(Simplex a, Symbol)])
 preSchemeToScheme pSch =
     (translateVia table pSch, table)
         where
             table = nubBy isFaceOf pSch `zip` ([toEnum 1 ..] :: [Symbol])
 
-translateVia :: [(Simplex,Symbol)] -> PreScheme -> Scheme
+translateVia :: [(Simplex a, Symbol)] -> PreScheme a -> Scheme
 translateVia tab pSch = map f pSch
     where
         f e = case lookup e tab of

@@ -8,7 +8,7 @@ module TwoDimPseudoManifold
     , singularities
     , fixSingularity
     , fixAllSingularities
---    , baseSurfaces
+    , baseSurfaces
 ) where
 
 import Control.Arrow ( (&&&), second )
@@ -38,8 +38,8 @@ import SimplicialComplex (
                            , vMap
  )
 
---import TwoDimManifold ( identifySurface )
---import Surface ( Surface )
+import TwoDimManifold ( identifySurface )
+import Surface ( Surface )
 
 import Util ( (.:) )
 
@@ -121,6 +121,6 @@ fixAllSingularities c =
         where
             c' = complexMap (id &&& const 0) c
 
---baseSurfaces :: Complex a -> [Surface]
---baseSurfaces =
---    map identifySurface . connectedComponents . fst . fixAllSingularities
+baseSurfaces :: (Eq a) => Complex a -> [Surface]
+baseSurfaces =
+    map identifySurface . connectedComponents . fixAllSingularities
