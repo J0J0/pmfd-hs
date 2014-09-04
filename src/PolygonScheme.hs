@@ -4,7 +4,6 @@ module PolygonScheme
       Symbol
     , Scheme
     , SchemeWL(..)
-    , sloop
     , toSchemeWL
     , invSymb
     , invSch
@@ -75,11 +74,11 @@ splitBeforeLastPair xs = ([], xs)
 -- normalizing a scheme
 
 data SchemeWL  = SchemeWL {   scheme :: Scheme
-                            , msloop  :: Maybe Scheme }
+                            , sloop  :: Maybe Scheme }
                  deriving (Show)
 
-sloop :: SchemeWL -> Scheme
-sloop = fromMaybe [] . msloop
+loop :: SchemeWL -> Scheme
+loop = fromMaybe [] . sloop
 
 toSchemeWL :: Scheme -> SchemeWL
 toSchemeWL sch = SchemeWL sch Nothing
@@ -229,9 +228,9 @@ step5 = return . step5'
 -- do all steps
 normalizeSchemeWL :: SchemeWL -> SchemeWL
 normalizeSchemeWL sch =
-    SchemeWL sch' (msloop sch >> Just loop')
+    SchemeWL sch' (sloop sch >> Just loop')
     where
-        (sch', loop') = runState (allSteps $ scheme sch) (sloop sch)
+        (sch', loop') = runState (allSteps $ scheme sch) (loop sch)
         allSteps sch  = return sch >>= step1 >>= step2
                        >>= step3 >>= step4 >>= step5
 

@@ -3,7 +3,7 @@ module TwoDimPseudoManifold
 (
       isTwoDimPseudoManifold
     , isTwoDimManifold
-    , starComponents
+    , starSummands
     , isSingularity
     , singularities
     , fixSingularity
@@ -44,8 +44,8 @@ import Surface ( Surface )
 import Util ( (.:) )
 
 
-type StarComponent a = [Simplex a]
-type StarComponents a = [StarComponent a]
+type StarSummand a = [Simplex a]
+type StarSummands a = [StarSummand a]
 
 
 isTwoDimPseudoManifold :: Complex a -> Bool
@@ -57,30 +57,30 @@ isTwoDimManifold c =
     isTwoDimPseudoManifold c && (null . singularities) c
 
 
-starComponents :: Vertex a -> Complex a -> StarComponents a
-starComponents = findComponents .: star
+starSummands :: Vertex a -> Complex a -> StarSummands a
+starSummands = findSummands .: star
 
-findComponents :: Complex a -> StarComponents a
-findComponents c =
+findSummands :: Complex a -> StarSummands a
+findSummands c =
     case filter (isNSimplex 2) c of
         []  -> []
-        s:_ -> let component = dfsSimplices c s
-                   c' = c \\ component
-               in component : findComponents c'
+        s:_ -> let summand = dfsSimplices c s
+                   c' = c \\ summand
+               in summand : findSummands c'
 
-isSingleComponent :: StarComponents a -> Bool
-isSingleComponent (_:[]) = True
-isSingleComponent _      = False
+isSingleSummand :: StarSummands a -> Bool
+isSingleSummand (_:[]) = True
+isSingleSummand _      = False
 
 isSingularity :: Vertex a -> Complex a -> Bool
-isSingularity = not . isSingleComponent .: starComponents
+isSingularity = not . isSingleSummand .: starSummands
 
-singularities :: Complex a -> [(Vertex a, StarComponents a)]
+singularities :: Complex a -> [(Vertex a, StarSummands a)]
 singularities c =
-    filter multipleComponents $ map vertexWithComponents $ vertices c
+    filter multipleSummands $ map vertexWithSummands $ vertices c
     where
-        multipleComponents = not . isSingleComponent . snd
-        vertexWithComponents v = (v, starComponents v c)
+        multipleSummands = not . isSingleSummand . snd
+        vertexWithSummands v = (v, starSummands v c)
 
 fixSingularity :: (Eq a) => Vertex a -> Complex a -> Complex (a, Int)
 fixSingularity v c =
@@ -92,12 +92,12 @@ fixSingularity v c =
 fixSingularity' :: (Eq a) => 
                     Vertex (a, Int) -> Complex (a, Int) -> Complex (a, Int)
 fixSingularity' v c =
-    case starComponents v c of
+    case starSummands v c of
         _:[]  -> c
         comps -> fixSingularity'' v comps c
 
 fixSingularity'' :: (Eq a) =>
-                     Vertex (a, Int) -> StarComponents (a, Int) ->
+                     Vertex (a, Int) -> StarSummands (a, Int) ->
                         Complex (a, Int) -> Complex (a, Int)
 fixSingularity'' v comps c =
     let comps' = map (parentSimplices [v] . generatedBy) comps

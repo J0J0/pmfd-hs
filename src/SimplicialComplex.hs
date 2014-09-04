@@ -62,7 +62,7 @@ import Data.List (
 import Control.Monad.State
 import Util ( equalLength, roundToMagnitude )
 
--- | A 'Vertex' can be anything you like and is an intance of 'Eq'.
+-- | A 'Vertex' can be anything you like that is an intance of 'Eq'.
 data Vertex a where
     Vertex :: (Eq a) => a -> Vertex a
 
