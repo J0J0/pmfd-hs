@@ -88,6 +88,8 @@ disjointUnionsInd t cs =
     concatMap f $ cs `zip` [t..]
         where
             f (c,j) = complexMap (id &&& const j) c
+            -- > id &&& const j  ==  flip (,) j
+            -- but i find the first variant more comprehensible
 
 connectedSumAt :: (Eq a, Eq b) =>
                     Simplex a -> Complex a -> Simplex b -> Complex b ->
