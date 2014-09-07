@@ -215,11 +215,14 @@ step4h w0 x (y:z:_:_:rest') = do
 
 
 -- handle schemes with four symbols
+-- (loop tracing isn't important here, since the
+-- word problem for surfaces with four symbols is
+-- a special case anyway)
 step5' :: Scheme -> Scheme
 step5' xs@[x,xx,y,yy]
-    | x == xx         &&  y == yy          =  [x,invSymb y,x,y]
-    | x == xx         &&  y == invSymb yy  =  [x,y,x,y]
-    | x == invSymb yy && xx == invSymb y   =  [yy,x,xx,y]
+    | x == xx         &&  y == yy          =  [x,invSymb y,x,y]  -- Klein bottle
+    | x == xx         &&  y == invSymb yy  =  [x,y,x,y]          -- projective plane
+    | x == invSymb yy && xx == invSymb y   =  [yy,x,xx,y]        -- sphere
 step5' xs = xs
 
 step5 :: Scheme -> SchemeWLst

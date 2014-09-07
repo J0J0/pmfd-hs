@@ -6,9 +6,13 @@ module TwoDimManifold
     , toComplWL
     , polygonScheme
     , polygonSchemeWL
+    , polygonPSchemeWL
     , polygonSchemeAtSimplex
     , identifySurface
     , buildSchemeWL
+    , preSchemeToScheme
+    , preSchemeToScheme'
+    , translateVia
 ) where
 
 import Control.Arrow ( second )
@@ -71,6 +75,15 @@ twoSimplexBoundary s =
 identifySurface :: Complex a -> Surface
 identifySurface = identifySurfaceScheme . polygonScheme
 
+
+-- FIXME: the whole polygonScheme stuff needs a refactoring:
+--        conversion from PreScheme to Scheme should happen
+--        much later and, optimally, PreScheme/Scheme would be
+--        clearly separated while both should be exported since we
+--        need direct access to PreSchemes in TwoDimPseudoManifold.Loop.
+--        'polygonPSchemeWL' is just a quick hack used in the latter
+--        module ... :(
+ 
 polygonScheme :: Complex a -> Scheme
 polygonScheme =
     scheme . normalizeSchemeWL . polygonSchemeWL . toComplWL
@@ -78,6 +91,15 @@ polygonScheme =
 polygonSchemeWL :: ComplexWL a -> SchemeWL
 polygonSchemeWL c =
     polygonSchemeAtSimplex c $ head $ delete [] $ complex c
+
+-- meh, duplicate code, see FIXME above ...
+polygonPSchemeWL :: Complex a -> PreScheme a -> (PreScheme a, PreScheme a)
+polygonPSchemeWL c loop =
+    runState (buildPSchemeWL initPSch ss []) loop
+        where
+            s'     = head $ filter (isNSimplex 2) c
+            (s:ss) = reverse $ dfsSimplices c s'
+            initPSch = twoSimplexBoundary s
 
 
 polygonSchemeAtSimplex :: ComplexWL a -> Simplex a -> SchemeWL
@@ -117,6 +139,11 @@ buildPSchemeWL curPSch (s:ss) ss' = do
         Nothing   -> buildPSchemeWL curPSch ss (s:ss')
         Just pSch -> buildPSchemeWL pSch ss ss'
 
+-- FIXME: tryPasteSimplex is used for both pastings (polygon, loop)
+--        (because the code would be almost the same)
+--        but the case switch with "when" is rather hacky;
+--        maybe find a better solution!?
+
 tryPasteSimplex :: Simplex a -> Simplex a -> (PreScheme a) -> 
                     State (PreScheme a) (Maybe (PreScheme a))
 tryPasteSimplex s s' sch =
@@ -129,15 +156,19 @@ tryPasteSimplex s s' sch =
 
 adjustLoop :: Simplex a -> Simplex a -> State (PreScheme a) ()
 adjustLoop e s = do
-    l' <- get >>= tryPasteSimplex e s
-    unless (isNothing l') $ put (fromJust l')
-    return ()
+    get >>= tryPasteSimplex e s >>= \case
+        Nothing -> return ()
+        Just l' -> do put l'
+                      adjustLoop e s
 
 preSchemeToScheme :: PreScheme a -> (Scheme, [(Simplex a, Symbol)])
-preSchemeToScheme pSch =
+preSchemeToScheme = preSchemeToScheme' 1
+    
+preSchemeToScheme' :: Int -> PreScheme a -> (Scheme, [(Simplex a, Symbol)])
+preSchemeToScheme' t pSch =
     (translateVia table pSch, table)
         where
-            table = nubBy isFaceOf pSch `zip` ([toEnum 1 ..] :: [Symbol])
+            table = nubBy isFaceOf pSch `zip` ([toEnum t ..] :: [Symbol])
 
 translateVia :: [(Simplex a, Symbol)] -> PreScheme a -> Scheme
 translateVia tab pSch = map f pSch

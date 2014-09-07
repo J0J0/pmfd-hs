@@ -31,6 +31,7 @@ import Util ( rotations, slidingBlock )
 --   > dehnAlg [r] w2 == mkSch [-1]
 --   > dehnAlg [r] w3 == []
 dehnAlg :: [Scheme] -> Scheme -> Scheme
+dehnAlg []   sch = reduce sch
 dehnAlg rels sch =
     dehnAlg' allRels minmaxRL' (reduce sch)
         where

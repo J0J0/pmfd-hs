@@ -2,13 +2,17 @@
 
 module TwoDimPseudoManifold.GluingGraph
 (
-      GluingGraphD
+      GComplex
+    , GluingGraphD
+    , GluedObj
     , GluedVertices
     , GluedComplexes
     , GluedSurfaces
     , GluedD(..)
     , gluingGraph
     , gluingGraphSurf
+    , gluingGraphFromFixed
+    , identifyGluedSurfaces
 ) where
     
 import Control.Arrow ( (&&&), second )
@@ -46,10 +50,10 @@ data GluedD a = GluedD {
 deriving instance (Show a) => Show (GluedD a)
 
 gluingGraph :: (Eq a) =>  Complex a -> GluedD a
-gluingGraph = fixedGluingGraph . fixAllSingularities
+gluingGraph = gluingGraphFromFixed . fixAllSingularities
 
-fixedGluingGraph :: (Eq a) => GComplex a -> GluedD a
-fixedGluingGraph c =
+gluingGraphFromFixed :: (Eq a) => GComplex a -> GluedD a
+gluingGraphFromFixed c =
     GluedD { glGraphD = graph, glVertices = vsm, glComplexes = comps }
         where
             comps = LM.fromDistinctAscList $ [0..] `zip` connectedComponents c

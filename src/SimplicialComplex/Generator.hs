@@ -115,11 +115,14 @@ innerConnectedSum d p q c =
         (s1:_, s2:_) = filter2 (pred p) (pred q) c
     in innerConnectedSumAt s1 s2 c
 
-connectedSum :: (Eq a, Eq b) =>
+connectedSum, (#) :: (Eq a, Eq b) =>
                     Complex a -> Complex b -> Complex (Either a b)
 connectedSum c1 c2 =
     let d = min (dim c1) (dim c2)
     in connectedSum' d c1 c2
+
+infixr 9 #
+(#) = connectedSum
 
 connectedSum' :: (Integral i, Eq a, Eq b) =>
                     i -> Complex a -> Complex b -> Complex (Either a b)
@@ -151,8 +154,11 @@ wedgeSumAt :: (Eq a, Eq b) =>
 wedgeSumAt v1 c1 v2 c2 =
     connectedSumAt [v1] c1 [v2] c2
 
-wedgeSum :: (Eq a, Eq b) => Complex a -> Complex b -> Complex (Either a b)
+wedgeSum, (\/) :: (Eq a, Eq b) => Complex a -> Complex b -> Complex (Either a b)
 wedgeSum = connectedSum' 0
+
+infixr 9 \/
+(\/) = wedgeSum
 
 wedgeSums :: (Eq a) => [Complex a] -> Complex (a, Int)
 wedgeSums cs@(c:cs') =
