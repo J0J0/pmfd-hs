@@ -242,7 +242,7 @@ normalizeScheme =
     scheme . normalizeSchemeWL . toSchemeWL
 
 
--- rename symbols to obtain obtain canonical form
+-- rename symbols to obtain canonical form
 
 renameScheme :: Scheme -> (Scheme, Symbol -> Symbol)
 -- the only exception is the Klein bottle: 

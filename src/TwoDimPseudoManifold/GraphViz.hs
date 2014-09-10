@@ -2,7 +2,9 @@
 
 module TwoDimPseudoManifold.GraphViz
 (
-    visualizeGluingGraph
+      writeGluingGraph
+    , writeGluingGraph'
+    , visualizeGluingGraph
 ) where
 
 import Control.Arrow ( (***) )
@@ -60,12 +62,27 @@ nodeFmt :: Node -> GV.Attributes
 nodeFmt (GluingNode _, _)       = []
 nodeFmt (SurfaceNode _, Just s) = [ GV.toLabel $ show s ]
 
+writeGluingGraph :: (GluingGraphD, GluedSurfaces) -> FilePath -> IO ()
+writeGluingGraph = flip writeGluingGraph' $ GV.Png
+
+writeGluingGraph' :: (GluingGraphD, GluedSurfaces) ->
+                         GV.GraphvizOutput -> FilePath -> IO ()
+writeGluingGraph' gd gvo path =
+    runGraphviz (\ dotg -> GV.runGraphviz dotg gvo path) gd
+
 visualizeGluingGraph :: (GluingGraphD, GluedSurfaces) -> IO ()
-visualizeGluingGraph gd@(gg, _) =
-    GV.runGraphvizCanvas' (GV.graphElemsToDot gvParams ns es) GV.Xlib
+visualizeGluingGraph gd =
+    runGraphviz (flip GV.runGraphvizCanvas' GV.Xlib) gd
+
+runGraphviz :: (GV.DotGraph NodeType -> IO a) ->
+                  (GluingGraphD, GluedSurfaces) -> IO ()
+runGraphviz f gd@(gg, _) =
+    f dg >> return ()
         where
             ns = buildNodes gd
             es = buildEdges gg
+            dg = GV.graphElemsToDot gvParams ns es
+
 
 buildNodes :: (GluingGraphD, GluedSurfaces) -> [Node]
 buildNodes (m, mm) =

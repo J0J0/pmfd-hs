@@ -61,12 +61,12 @@ starSummands :: Vertex a -> Complex a -> StarSummands a
 starSummands = findSummands .: star
 
 findSummands :: Complex a -> StarSummands a
-findSummands c =
-    case filter (isNSimplex 2) c of
+findSummands st =
+    case filter (isNSimplex 2) st of
         []  -> []
-        s:_ -> let summand = dfsSimplices c s
-                   c' = c \\ summand
-               in summand : findSummands c'
+        s:_ -> let summand = dfsSimplices st s
+                   st' = st \\ summand
+               in summand : findSummands st'
 
 isSingleSummand :: StarSummands a -> Bool
 isSingleSummand (_:[]) = True
@@ -94,22 +94,22 @@ fixSingularity' :: (Eq a) =>
 fixSingularity' v c =
     case starSummands v c of
         _:[]  -> c
-        comps -> fixSingularity'' v comps c
+        sSs   -> fixSingularity'' v sSs c
 
 fixSingularity'' :: (Eq a) =>
                      Vertex (a, Int) -> StarSummands (a, Int) ->
                         Complex (a, Int) -> Complex (a, Int)
-fixSingularity'' v comps c =
-    let comps' = map (parentSimplices [v] . generatedBy) comps
-        oldSimplices = [v] : concatMap (delete [v]) comps'
-        newSimplices = concatMap (replaceComp v) $ [1..] `zip` comps'
+fixSingularity'' v sSs c =
+    let sSs' = map (parentSimplices [v] . generatedBy) sSs
+        oldSimplices = [v] : concatMap (delete [v]) sSs'
+        newSimplices = concatMap (replaceStarSummand v) $ [1..] `zip` sSs'
     in (c \\ oldSimplices) `union` newSimplices
 
-replaceComp :: (Eq a) => 
-                Vertex (a, Int) -> (Int, [Simplex (a, Int)]) ->
-                    [Simplex (a, Int)]
-replaceComp v (j, comp') =
-    map (map subsv) comp'
+replaceStarSummand :: (Eq a) => 
+                        Vertex (a, Int) -> (Int, [Simplex (a, Int)]) ->
+                            [Simplex (a, Int)]
+replaceStarSummand v (j, sS') =
+    map (map subsv) sS'
         where
             vnew = vMap (second $ const j) v
             subsv vv | vv == v    =  vnew

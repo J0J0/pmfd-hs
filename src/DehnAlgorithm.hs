@@ -22,7 +22,7 @@ import Util ( rotations, slidingBlock )
 --   
 --   > mkSch xs = map toEnum xs :: Scheme
 --   > r  = mkSch [1,1,2,2,3,3]  -- relator of the fundamental group of
---                               -- "the" non-orientable surface of genus 3
+--   >                           -- "the" non-orientable surface of genus 3
 --   > w1 = mkSch [1,2,2,3,3,1]
 --   > w2 = mkSch [1,2,2,3,3]
 --   > w3 = mkSch [2,2,3,3,1,-3,-3,-2,-2,1,-3,-3,-2,-2,-1,-1,-1,-1]

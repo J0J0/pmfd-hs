@@ -5,8 +5,8 @@ module TwoDimPseudoManifold.Loop
     , Loop
     , LoopS
     , isWalkIn
-    , isClosedWalkIn
     , isLoopIn
+    , isSimpleLoopIn
     , isTrivial
     , simplifyOnSphere
     , simplifyOnTorus
@@ -76,13 +76,13 @@ isWalkIn w c =
             es  = filter (isNSimplex 1) c
             es' = es ++ map reverse es
 
-isClosedWalkIn :: Walk a -> Complex a -> Bool
-isClosedWalkIn l c =
+isLoopIn :: Loop a -> Complex a -> Bool
+isLoopIn l c =
     l `isWalkIn` c && head l == last l
 
-isLoopIn :: Walk a -> Complex a -> Bool
-isLoopIn l c =
-    l `isClosedWalkIn` c && (tail l) == nub (tail l)
+isSimpleLoopIn :: Loop a -> Complex a -> Bool
+isSimpleLoopIn l c =
+    l `isLoopIn` c && (tail l) == nub (tail l)
 
 
 isTrivial :: (Eq a) => Loop a -> Complex a -> Bool
