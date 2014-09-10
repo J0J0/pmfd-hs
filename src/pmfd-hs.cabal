@@ -1,0 +1,37 @@
+
+name:                pmfd-hs
+version:             0.1.0
+-- synopsis:            
+-- description:         
+license:             ISC
+license-file:        LICENSE
+author:              Johannes Prem
+--maintainer:        
+copyright:           Johannes.Prem@stud.uni-regensburg.de  
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  exposed-modules:     
+                       SimplicialComplex,
+                       SimplicialComplex.Generator,
+                       TwoDimPseudoManifold,
+                       TwoDimPseudoManifold.Loop,
+                       TwoDimPseudoManifold.GluingGraph,
+                       TwoDimPseudoManifold.GraphViz,
+                       TwoDimManifold, 
+                       PolygonScheme,
+                       Surface,
+                       DehnAlgorithm,
+                       Util
+  other-extensions:    GADTs,
+                       GADTSyntax,
+                       StandaloneDeriving,
+                       LambdaCase
+  build-depends:       base >=4.7 && <4.8,
+                       mtl >=2.1 && <2.2,
+                       containers >=0.5 && <0.6,
+                       split >=0.2 && <0.3,
+                       graphviz >=2999.17 && <2999.18,
+                       wl-pprint-text >=1.1 && <1.2
+  default-language:    Haskell2010
