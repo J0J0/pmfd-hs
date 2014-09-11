@@ -1,5 +1,11 @@
 {-# LANGUAGE StandaloneDeriving #-}
 
+-- |
+-- Module      : TwoDimPseudoManifold.GluingGraph
+-- Description : A graph representation of a 2-dim. pseudomanifold
+-- Copyright   : (c) Johannes Prem, 2014
+-- License     : ISC License
+
 module TwoDimPseudoManifold.GluingGraph
 (
       GComplex
@@ -41,6 +47,8 @@ type GluedVertices  a = GluedObj (Vertex a)
 type GluedComplexes a = GluedObj (GComplex a)
 type GluedSurfaces    = GluedObj Surface
 
+-- | A 'GluedD' holds the graph data that we extract
+--   from a 2-dim. pseudomanifold.
 data GluedD a = GluedD {  
                          glGraphD    :: GluingGraphD
                        , glVertices  :: GluedVertices a
@@ -49,9 +57,19 @@ data GluedD a = GluedD {
 
 deriving instance (Show a) => Show (GluedD a)
 
+-- | 'gluingGraph' takes a 2-dim. pseudomanifold,
+--   fixes all singularities and extracts the gluing
+--   information.
+--   The input complex must be a 2-dim. pseudomanifold.
 gluingGraph :: (Eq a) =>  Complex a -> GluedD a
 gluingGraph = gluingGraphFromFixed . fixAllSingularities
 
+-- | 'gluingGraphFromFixed' takes a 2-dim. manifold of the
+--   form that 'fixAllSingularities' returns and extracts
+--   the gluing information.
+--   
+--   The input complex must be a 2-dim. manifold of the type
+--   and format described by 'fixSingularity' in "TwoDimPseudoManifold".
 gluingGraphFromFixed :: (Eq a) => GComplex a -> GluedD a
 gluingGraphFromFixed c =
     GluedD { glGraphD = graph, glVertices = vsm, glComplexes = comps }
@@ -75,6 +93,12 @@ addGluingData vsi j comp m =
             gluedToVs = map (vMap fst) gluedVs 
             toId v = fromJust $ lookup v vsi
 
+-- | Convenience function that obtains the 'GlueD' for a 2-dim.
+--   pseudomanifold and extracts the most interesting parts,
+--   namely the actual graph data and which surfaces are glued
+--   together.
+--   
+--   The input complex must be a 2-dim. pseudomanifold.
 gluingGraphSurf :: (Eq a) =>
                     Complex a -> (GluingGraphD, GluedSurfaces)
 gluingGraphSurf =

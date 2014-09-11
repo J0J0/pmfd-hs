@@ -1,7 +1,15 @@
 
+-- |
+-- Module      : DehnAlgorithm
+-- Description : An implementation of Dehn's algorithm
+-- Copyright   : (c) Johannes Prem, 2014
+-- License     : ISC License
+
 module DehnAlgorithm
 (
-    dehnAlg
+        dehnAlg
+    ,   AllRelators
+    ,   dehnAlg'
 ) where
 
 
@@ -18,7 +26,9 @@ import Util ( rotations, slidingBlock )
 -- | @'dehnAlg' rs w@ applies Dehn's algorithm
 --   (<http://en.wikipedia.org/wiki/Small_cancellation_theory#Dehn.27s_algorithm Wikipedia>)
 --   with relators @rs@ to the word @w@. Note, that @rs@ should /not/
---   include cyclic permutations because they are generated anyway. Examples:
+--   include cyclic permutations because they are generated anyway.
+--   (If you know what you're doing, you can use 'dehnAlg'' directly, see below.)
+--   Examples:
 --   
 --   > mkSch xs = map toEnum xs :: Scheme
 --   > r  = mkSch [1,1,2,2,3,3]  -- relator of the fundamental group of
@@ -41,8 +51,8 @@ dehnAlg rels sch =
                               (kk,kk) allRels
             minmaxRL' = first (\ k -> k `div` 2 + 1) minmaxRL
 
+-- | @[(length of relators in the second tuple component, list of relators)]@
 type AllRelators = [(Int,[Scheme])]
--- [(length of following relators, list of relators)]
 
 -- takes a list of relators and adds all cyclic permutations
 -- and their inverses; note, that we make no attempt to detect
@@ -52,13 +62,13 @@ prepareRels = map (length &&& mkRels)
     where
         mkRels xs = rotations xs ++ rotations (invSch xs)
 
--- this is the actual implementation of Dehn's algorithm
-dehnAlg' :: AllRelators -- the relators to use; ensure that all cyclic
-                        -- permutations and their inverses are included!
-         -> (Int,Int)   -- (min. relator length / 2 + 1, max. relator length)
-         -> Scheme      -- word to reduce via the algorithm
-         -> Scheme      -- output word; if this is not empty, the
-                        --              input word is non-trivial
+-- | This is the actual implementation of Dehn's algorithm.
+dehnAlg' :: AllRelators -- ^ the relators to use; ensure that all cyclic
+                        --   permutations and their inverses are included!
+         -> (Int,Int)   -- ^ (min. relator length / 2 + 1, max. relator length)
+         -> Scheme      -- ^ word to reduce via the algorithm
+         -> Scheme      -- ^ output word; if this is not empty, the
+                        --                input word is non-trivial
 dehnAlg' _ _ [] = []
 dehnAlg' rels rl@(minRLh,maxRL) sch =
     let nmax        = min maxRL (length sch)
@@ -81,7 +91,7 @@ tryReplace rels sch n =
         return $ intercalate (invSch relrest) $ splitOn subsch sch
 
 -- @'tryFind' subsch n (k, rs)@ tries to find the word @subsch@
--- of length @n@ as a prefix of one of the relators @rs@.
+-- of length @n@ as a prefix of one of the relators @rs@ of length k.
 -- It returns the remaining suffix from the first matching relator,
 -- or Nothing if there are no matches.
 tryFind :: Scheme -> Int -> (Int, [Scheme]) -> Maybe Scheme

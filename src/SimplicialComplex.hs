@@ -7,14 +7,8 @@
 -- License     : ISC License
 -- 
 -- This module contains the basic 'Complex' type, used throughout
--- the software. We don't aim for efficiency but for a representation
+-- the library. We don't aim for efficiency but for a representation
 -- that is closely related to the mathematical objects.
--- 
--- Note, that most of the functions are not (yet) failsafe and
--- you should always make sure that the documented assumptions
--- on input arguments are satisfied in order to guarantee valid
--- results without errors.
--- 
 
 module SimplicialComplex
 (
@@ -139,6 +133,12 @@ isConnected c = equalLength allVertices foundVertices
         allVertices = vertices c
         foundVertices = dfsVertices c $ head allVertices
 
+-- | Returns 'True' if and only if the following properties
+--    are satisfied by the input complex @c@ of dimension @n@
+--    (i. e. @n == 'dim' c@):
+--   * Every simplex of @c@ is a face of an @n@-simplex of @c@.
+--   * Every @(n-1)@-simplex of @c@ is the face of exactly
+--     two @n@-simplices of @c@.
 isPseudoManifold :: Complex a -> Bool
 isPseudoManifold c = isNPseudoManifold (dim c) c
 

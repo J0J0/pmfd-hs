@@ -1,4 +1,10 @@
 
+-- |
+-- Module      : SimplicialComplex.Generator
+-- Description : Complex building and modifying functions
+-- Copyright   : (c) Johannes Prem, 2014
+-- License     : ISC License
+
 module SimplicialComplex.Generator where
 
 import Control.Arrow ( (&&&) )

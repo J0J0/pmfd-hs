@@ -1,4 +1,10 @@
 
+-- |
+-- Module      : TwoDimPseudoManifold.Loop
+-- Description : Simplify loops on 2-dim. pseudomanifolds
+-- Copyright   : (c) Johannes Prem, 2014
+-- License     : ISC License
+
 module TwoDimPseudoManifold.Loop
 (
       Walk
@@ -69,26 +75,41 @@ type Loop a = Walk a
 type LoopS  = Scheme
 
 
-isWalkIn :: Walk a -> Complex a -> Bool
+-- | Test whether some sequence of vertices determines a
+--   walk a complex.
+isWalkIn :: [Vertex a] -> Complex a -> Bool
 isWalkIn w c =
     all (\ (v,v') -> [v,v'] `elem` es') $ w `zip` (tail w)
         where
             es  = filter (isNSimplex 1) c
             es' = es ++ map reverse es
 
-isLoopIn :: Loop a -> Complex a -> Bool
+-- | Test whether a given walk is a loop, i. e. if the 
+--   walk is closed. In this context a loop may contain
+--   a vertex more than once.
+isLoopIn :: Walk a -> Complex a -> Bool
 isLoopIn l c =
     l `isWalkIn` c && head l == last l
 
+-- | Test whether a loop is a simple loop, i. e. if
+--   its vertices are pairwise distinct.
 isSimpleLoopIn :: Loop a -> Complex a -> Bool
 isSimpleLoopIn l c =
     l `isLoopIn` c && (tail l) == nub (tail l)
 
 
+-- | Tests whether a loop in a pseudomanifold is contractible.
+--
+--   The input complex must be a 2-dim. pseudomanifold.
 isTrivial :: (Eq a) => Loop a -> Complex a -> Bool
 isTrivial = null . uncurry simplifyLoop . normalize .: schemesWL
 
 
+-- This function computes the schemes of the closed surfaces that
+-- can be glued to the input pseudomanifold (much like 'baseSurfaces'
+-- from "TwoDimPseudoManifold") but also computes a representation
+-- of the given loop in terms of this schemes (and other symbols
+-- if necessary).
 schemesWL :: (Eq a) => Loop a -> Complex a -> (GluedObj Scheme, LoopS)
 schemesWL l c =
     (schs, ll')
@@ -121,6 +142,8 @@ schemesWL l c =
             
             ll'  = filter (/= (toEnum 0)) $ translateVia tabAll lpsch'
 
+-- Normalize all input schemes and additionally modify the given
+-- loop to reflect the normalization steps.
 normalize :: (GluedObj Scheme, LoopS) -> (GluedObj Scheme, LoopS)
 normalize (schs, loop) =
     second fromJust $ swap $
@@ -131,6 +154,10 @@ normalize (schs, loop) =
                         swl' = normalizeSchemeWL swl
                     in (sloop swl', scheme swl')
 
+-- Once we identified the surface schemes and have a loop in terms of
+-- this schemes, we use this function to reduce the loop scheme.
+-- It uses Dehn's algorithm for surface schemes with more than 4 symbols
+-- and the functions 'simplifyOnXX' below for the other cases.
 simplifyLoop :: GluedObj Scheme -> LoopS -> LoopS
 simplifyLoop schs l =
     simplifyLoop' xs os l'
@@ -157,10 +184,14 @@ simplifyLoop' xs@[tori,planes,bottles] others l =
         if l /= l'' then simplifyLoop' xs others l'' else l
 
 
+-- | Reduces the parts of a loop that live on a 2-sphere.
+--   Since the 2-sphere is simply connected, every loop is
+--   trivial here.
 simplifyOnSphere :: Scheme -> LoopS -> LoopS
 simplifyOnSphere sch l =
     l >>= (\ x -> if x `elem` sch then [] else [x])
 
+-- | Reduces the parts of a loop that live on the torus.
 simplifyOnTorus :: Scheme -> LoopS -> LoopS
 simplifyOnTorus sch l =
     concat $ zipWith ($) fff chunks
@@ -171,6 +202,7 @@ simplifyOnTorus sch l =
                                _                      -> [id,f]
             f = sortBy (compare `on` (abs . fromEnum)) 
 
+-- | Reduces the parts of a loop that live on a projective plane.
 simplifyOnPrPlane :: Scheme -> LoopS -> LoopS
 simplifyOnPrPlane [x,y,_,_] l =
     concat $ zipWith ($) fff chunks
@@ -183,6 +215,7 @@ simplifyOnPrPlane [x,y,_,_] l =
             f ch = if even (length ch)
                    then [] else [x] 
 
+-- | Reduces the parts of a loop that live on a Klein bottle.
 simplifyOnKleinB :: Scheme -> LoopS -> LoopS
 simplifyOnKleinB sch@[x,_,_,y] l =
     concat $ zipWith ($) fff chunks
@@ -213,6 +246,13 @@ simplifyOnKleinB sch@[x,_,_,y] l =
                  | z == iy  =  (0,-1)
 
 
+-- This function lifts a loop from a pseudomanifold @c@ to the
+-- complex @c'@ returned by 'fixAllSingularities'. 
+-- In the case where the input loop passes any singularities of
+-- @c@, the returned loop, however, cannot actually be a loop
+-- in @c'@ because the vertex at the singularity has been split up.
+-- In such cases 'liftV' (see below) introduces a pseudo vertex with
+-- index -1 in order to preserve the information in our loop.
 liftLoop :: (Eq a) =>
              Loop a -> Complex a -> Complex (a, Int) ->
                  GluedD a -> Loop (a, Int)
@@ -263,7 +303,7 @@ mapSpanningEdges gd es =
                                        (vertices comp)
                 in [v', vMap (id &&& const (-1)) v]
     
-    
+
 
 spanningEdges :: Complex a -> [Simplex a]
 spanningEdges c =

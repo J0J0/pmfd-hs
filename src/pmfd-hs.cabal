@@ -7,7 +7,7 @@ license:             ISC
 license-file:        LICENSE
 author:              Johannes Prem
 --maintainer:        
-copyright:           Johannes.Prem@stud.uni-regensburg.de  
+copyright:           Johannes Prem
 build-type:          Simple
 cabal-version:       >=1.10
 

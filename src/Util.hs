@@ -1,4 +1,10 @@
 
+-- |
+-- Module      : Util
+-- Description : Utility functions
+-- Copyright   : (c) Johannes Prem, 2014
+-- License     : ISC License
+
 module Util
 (
       (.:)

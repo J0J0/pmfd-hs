@@ -1,5 +1,11 @@
 {-# LANGUAGE StandaloneDeriving #-}
 
+-- |
+-- Module      : TwoDimPseudoManifold.GraphViz
+-- Description : Use graphviz to show gluing graphs
+-- Copyright   : (c) Johannes Prem, 2014
+-- License     : ISC License
+
 module TwoDimPseudoManifold.GraphViz
 (
       writeGluingGraph
