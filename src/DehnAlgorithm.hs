@@ -47,7 +47,7 @@ dehnAlg rels sch =
         where
             allRels   = prepareRels rels
             kk        = fst $ head allRels
-            minmaxRL  = foldr (\ (k,_) (x,y) -> (min k x, max k x)) 
+            minmaxRL  = foldr (\ (k,_) (x,y) -> (min k x, max k y))
                               (kk,kk) allRels
             minmaxRL' = first (\ k -> k `div` 2 + 1) minmaxRL
 
