@@ -6,4 +6,4 @@ decide whether a given [loop](http://mathworld.wolfram.com/FundamentalGroup.html
 is null-homotopic (i.e. (pointed) homotopic to a constant loop).
 
 Haddock generated documentation: [pmfd-hs-doc](http://homepages.uni-r.de/~prj05723/_ba/pmfd-hs-doc/)
-<!-- My bachelor thesis (see especially sections 4.2 and 4.3): -->
+My bachelor thesis (see especially sections 4.2 and 4.3): [loop_agreement on github](https://github.com/J0J0/loop_agreement)
